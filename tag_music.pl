@@ -6,28 +6,64 @@ use Digest::MD5;
 use Storable qw(nstore retrieve);
 use File::Basename;
 
+
 my $fast = 0;
-my $music_path = "/media/Canada/Music/";
+my $music_path = "/media/Canada/Music";
 my @music_exts = (".mp3", ".wma", ".mp4", ".ogg", ".m4a");
+
 my $index_file = "index.struct";
-my $index;
+my $tags_file = "tags.struct";
+my $index = {};
 my $tags = {
     AUTO => {},
     USER => {}
 };
 
 
-
-# Get saved index file, if it exists
-if (-e $index_file)
-{
-    $index = retrieve($index_file);
-}
+retrieve_memory_files($index, $tags);
 
 # If index file retrieved, prepare list of existing paths
 my $existing_paths;
 if (defined $index)
 {
+    make_existing_filelist($existing_paths, $index);
+}
+
+# Walk directory and apply function
+find sub{update_index($index, $tags, $fast)}, $music_path;
+
+# Delete relative path entries to delete files from index
+remove_deleted_files($index, $existing_paths);
+
+
+
+
+# store index and tags
+store_memory_files($index, $tags);
+
+
+
+
+
+sub retrieve_memory_files
+{
+    my ($index, $tags) = @_;
+    
+    if (-e $index_file)
+    {
+        $index = retrieve($index_file);
+    }
+    
+    if (-e $tags_file)
+    {
+        $tags = retrieve($tags_file);
+    }
+}
+
+sub make_existing_filelist
+{
+    my ($existing_paths, $index);
+    
     for my $hash (keys %$index)
     {
         for my $rel_path (@{$index->{$hash}->{REL_PATH}})
@@ -36,12 +72,13 @@ if (defined $index)
             $existing_paths->{$rel_path}->{FOUND} = 0;
         }
     } 
+    
 }
 
-my $create_file_hash = sub
+sub update_index
 {
     # How to get this to work?
-    #my ($index) = @_;
+    my ($index, $tags, $fast) = @_;
     
     # Get full path name
     my $full_name = $File::Find::name;
@@ -80,7 +117,8 @@ my $create_file_hash = sub
         return 0;
     }
     
-    # if relative path already exists, make a note and stop function (slow check)
+    # if relative path already exists and hashes are identical, make a note and
+    # stop function (slow check)
     {
         # hash file
         open my $MUSIC, '<', $full_name;
@@ -100,8 +138,8 @@ my $create_file_hash = sub
     }
     
     # if file not found, add to index
-    # if slow process used and files found to be changed, old entry will be
-    # deleted later
+    # if slow process used and files found to be changed, add new file to index
+    # (old entry will be deleted later)
     {
         # hash file
         open my $MUSIC, '<', $full_name;
@@ -123,44 +161,47 @@ my $create_file_hash = sub
             print "added tag $tag to relative path $relative_name\n";
         }
         
-        
-        
+        # add file to existing _paths also
         $existing_paths->{$relative_name}->{HASH} = $hash;
         $existing_paths->{$relative_name}->{FOUND} = 1;
         
-
-
+        
         print "added   $hash";
     }
     
     print  "   " . $relative_name . "\n";
-};
+}
 
-# Walk directory and apply function
-find $create_file_hash, $music_path;
 
-# Delete relative path entries to delete files from index
-for my $rel_path (keys %$existing_paths)
+# if a file was found to be deleted, it should be removed from the index
+sub remove_deleted_files
 {
-    if ($existing_paths->{$rel_path}->{FOUND} eq 0)
+    my ($index, $existing_paths) = @_;
+    
+    for my $rel_path (keys %$existing_paths)
     {
-        my $hash = $existing_paths->{$rel_path}->{HASH};
-        
-        
-        @{$index->{$hash}->{REL_PATH}} = grep {$_ ne $rel_path} @{$index->{$hash}->{REL_PATH}};
-        print "delete relative path $rel_path from hash $hash\n";
-        
-        # Delete hash entry in index if no more associated paths left
-        if ((scalar @{$index->{$hash}->{REL_PATH}}) eq 0)
+        if ($existing_paths->{$rel_path}->{FOUND} eq 0)
         {
-            delete $index->{$hash};
-            print "delete hash $hash";
+            my $hash = $existing_paths->{$rel_path}->{HASH};
+            
+            
+            @{$index->{$hash}->{REL_PATH}} = grep {$_ ne $rel_path} @{$index->{$hash}->{REL_PATH}};
+            print "delete relative path $rel_path from hash $hash\n";
+            
+            # Delete hash entry in index if no more associated paths left
+            if ((scalar @{$index->{$hash}->{REL_PATH}}) eq 0)
+            {
+                delete $index->{$hash};
+                print "delete hash $hash";
+            }
         }
     }
 }
 
-# store index
-nstore $index, $index_file;
-
-exit;
-
+sub store_memory_files
+{
+    my ($index, $tags) = @_;
+    
+    nstore $index, $index_file;
+    nstore $tags, $tags_file;  
+}
