@@ -6,7 +6,7 @@ use Digest::MD5;
 use Storable qw(nstore retrieve);
 use File::Basename;
 
-
+my $fast = 0;
 my $music_path = "/media/Canada/Music/";
 my @music_exts = (".mp3", ".wma", ".mp4", ".ogg", ".m4a");
 my $index_file = "index.struct";
@@ -71,15 +71,37 @@ my $create_file_hash = sub
         return 0;
     }
 
-    # if relative path already exists, make a note and stop function
-    if (exists $existing_paths->{$relative_name}->{HASH})
+    # if relative path already exists, make a note and stop function (fast check)
+    if (exists $existing_paths->{$relative_name}->{HASH}
+        && $fast)
     {
         print "already found $relative_name\n";
         $existing_paths->{$relative_name}->{FOUND} = 1;
         return 0;
     }
-    # if not, add to index
-    else
+    
+    # if relative path already exists, make a note and stop function (slow check)
+    {
+        # hash file
+        open my $MUSIC, '<', $full_name;
+        my $md5 = Digest::MD5->new;
+        $md5->addfile($MUSIC);
+        my $hash = $md5->b64digest;
+        close $MUSIC;
+    
+        if (exists $existing_paths->{$relative_name}->{HASH}
+            && $hash eq $existing_paths->{$relative_name}->{HASH}
+            && ! $fast)
+        {
+            print "already found identical file $relative_name\n";
+            $existing_paths->{$relative_name}->{FOUND} = 1;
+            return 0;
+        }
+    }
+    
+    # if file not found, add to index
+    # if slow process used and files found to be changed, old entry will be
+    # deleted later
     {
         # hash file
         open my $MUSIC, '<', $full_name;
