@@ -14,12 +14,12 @@ sub update_index
     my ($index, $tags, $fast, $music_path, $music_exts) = @_;
     
     # If index file retrieved, prepare list of existing paths
-    my $existing_paths;
+    my $existing_paths = {};
     if (defined $index)
     {
         make_existing_filelist($existing_paths, $index);
     }
-    
+
     # Walk directory and apply function
     find sub{add_files_to_index($index, $tags, $fast, $music_path, $music_exts, $existing_paths)}, $music_path;
     
@@ -31,7 +31,7 @@ sub update_index
 
 sub make_existing_filelist
 {
-    my ($existing_paths, $index);
+    my ($existing_paths, $index) = @_;
     
     for my $hash (keys %$index)
     {
@@ -39,8 +39,10 @@ sub make_existing_filelist
         {
             $existing_paths->{$rel_path}->{HASH} = $hash;
             $existing_paths->{$rel_path}->{FOUND} = 0;
+            
         }
-    } 
+    }
+
     
 }
 

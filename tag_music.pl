@@ -1,7 +1,7 @@
 use warnings;
 use strict;
 
-use TagFiles;
+
 use TagMaintenance;
 use Storable qw(nstore retrieve);
 
@@ -10,7 +10,7 @@ our $tags_file = "tags.struct";
 
 
 my $fast = 1;
-my $music_path = "/media/Canada/Music/Zazie/";
+my $music_path = "/media/Canada/Music/";  # Should end with slash
 my @music_exts = (".mp3", ".wma", ".mp4", ".ogg", ".m4a");
 
 my $index = {};
@@ -32,9 +32,6 @@ my $tags = {
         $tags = retrieve($tags_file);
     }
 }
-
-use Data::Dumper;
-print Dumper($tags);
 
 
 TagMaintenance::update_index($index, $tags, $fast, $music_path, \@music_exts);
