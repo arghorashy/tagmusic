@@ -122,11 +122,17 @@ sub add_files_to_index
         # save the relative path for the file that produced this hash
         push @{$index->{$hash}->{REL_PATH}}, $relative_name;
         
-        # get auto tags
         my @autotags = split "/", $relative_name;
+
+        # record fnames
+		my $fname = pop @autotags;
+        #$fname =~ s/\.[a-z0-9A-Z]+//g;
+        $tags->{FNAME}->{$fname} = $fname;
+        $index->{$hash}->{TAGS}->{FNAME}->{$fname} = $fname;      
+
+        # get auto tags
         for my $tag (@autotags)
         {
-            $tag =~ s/\.[a-z0-9A-Z]+//g;
             $tags->{AUTO}->{$tag} = $tag;
             $index->{$hash}->{TAGS}->{AUTO}->{$tag} = $tag;
             print "added tag $tag to relative path $relative_name\n";
